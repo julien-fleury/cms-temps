@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3';
+import type { DatabaseSync } from 'node:sqlite';
 import type { AffaireAvecStats, AffaireInput, DashboardData, Pointage, PointageInput } from '../../shared/types.js';
 
 type AffaireRow = {
@@ -26,7 +26,7 @@ const affaireSelect = `
 const mapAffaire = (row: AffaireRow): AffaireAvecStats => ({ ...row, terminee: Boolean(row.terminee) });
 
 export class DataService {
-  constructor(private readonly getDb: () => Database.Database) {}
+  constructor(private readonly getDb: () => DatabaseSync) {}
 
   listAffaires(): AffaireAvecStats[] {
     const rows = this.getDb().prepare(`${affaireSelect} GROUP BY a.id ORDER BY a.terminee, a.date_creation DESC`).all() as AffaireRow[];
@@ -59,7 +59,7 @@ export class DataService {
   listPointages(affaireId?: number): Pointage[] {
     const sql = `SELECT id, affaire_id AS affaireId, date, heures, categorie, commentaire FROM pointages
       ${affaireId === undefined ? '' : 'WHERE affaire_id = ?'} ORDER BY date DESC, id DESC`;
-    return this.getDb().prepare(sql).all(...(affaireId === undefined ? [] : [affaireId])) as Pointage[];
+    return this.getDb().prepare(sql).all(...(affaireId === undefined ? [] : [affaireId])) as unknown as Pointage[];
   }
 
   createPointage(input: PointageInput): number {

@@ -1,6 +1,6 @@
 {
   "name": "cms-temps",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Suivi local des temps et de la rentabilité des affaires",
   "main": "dist-electron/main/index.js",
   "author": "CMS Temps",
@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "better-sqlite3": "latest",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
@@ -26,7 +25,6 @@
     "xlsx": "latest"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
@@ -47,7 +45,6 @@
     "productName": "CMS Temps",
     "directories": { "output": "release" },
     "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
-    "asarUnpack": ["node_modules/better-sqlite3/**/*"],
     "mac": { "target": ["dmg", "zip"], "category": "public.app-category.business" },
     "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true }

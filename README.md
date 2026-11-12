@@ -6,7 +6,6 @@ Application de bureau locale pour suivre les affaires, les pointages et la renta
 
 - Node.js 22 LTS
 - pnpm, npm ou yarn
-- Outils de compilation natifs (Xcode Command Line Tools sur macOS, Visual Studio Build Tools sur Windows)
 
 ## Développement
 
@@ -41,6 +40,8 @@ Sur Windows 10 ou 11, double-cliquer sur `INSTALLER-WINDOWS.cmd`. Le lanceur :
 5. ouvre l’Explorateur sur le fichier `.exe` obtenu dans `release`.
 
 Cette préparation nécessite une connexion Internet. Elle utilise normalement Windows Package Manager (`winget`) ; si sa source est indisponible, le lanceur télécharge automatiquement `fnm` depuis sa publication GitHub officielle. L’utilisateur final de CMS Temps n’a besoin que de l’installeur `.exe` produit.
+
+Depuis la version 1.0.3, SQLite est fourni directement par Electron : Python et Visual Studio Build Tools ne sont pas nécessaires pour compiler l’application sous Windows.
 
 ## Données
 
