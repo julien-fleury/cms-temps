@@ -88,7 +88,9 @@ export class DataService {
     const heuresParMois = db.prepare(`SELECT substr(date, 1, 7) AS mois, ROUND(SUM(heures), 2) AS heures
       FROM pointages GROUP BY substr(date, 1, 7) ORDER BY mois`).all() as DashboardData['heuresParMois'];
     const caProduitParMois = db.prepare(`SELECT substr(p.date, 1, 7) AS mois,
-      ROUND(SUM(p.heures * a.taux_horaire_reference), 2) AS ca
+      ROUND(SUM(p.heures), 2) AS heures,
+      ROUND(SUM(p.heures * a.taux_horaire_reference), 2) AS ca,
+      ROUND(SUM(p.heures * a.taux_horaire_reference) / SUM(p.heures), 2) AS caParHeure
       FROM pointages p INNER JOIN affaires a ON a.id = p.affaire_id
       GROUP BY substr(p.date, 1, 7) ORDER BY mois`).all() as DashboardData['caProduitParMois'];
     const rentabiliteParAffaire = this.listAffaires().map((a) => ({ nom: a.nom, credit: a.creditRestantEuros, consommation: a.ratioConsommation }));

@@ -49,7 +49,7 @@ export interface DashboardData {
   heuresTotales: number;
   chiffreAffairesTotal: number;
   heuresParMois: Array<{ mois: string; heures: number }>;
-  caProduitParMois: Array<{ mois: string; ca: number }>;
+  caProduitParMois: Array<{ mois: string; heures: number; ca: number; caParHeure: number }>;
   rentabiliteParAffaire: Array<{ nom: string; credit: number; consommation: number }>;
 }
 

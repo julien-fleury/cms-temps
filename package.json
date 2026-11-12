@@ -1,6 +1,6 @@
 {
   "name": "cms-temps",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Suivi local des temps et de la rentabilité des affaires",
   "main": "dist-electron/main/index.js",
   "author": "CMS Temps",
