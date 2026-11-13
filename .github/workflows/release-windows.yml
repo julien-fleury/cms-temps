@@ -48,7 +48,7 @@ jobs:
           }
 
       - name: Générer l’installateur
-        run: pnpm build
+        run: pnpm build:win
 
       - name: Conserver l’installateur comme artefact
         uses: actions/upload-artifact@v4
