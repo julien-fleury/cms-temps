@@ -4,7 +4,7 @@ import { calculerTauxHoraireProduction } from '../../../shared/calculations';
 import type { AffaireAvecStats, AffaireInput } from '../../../shared/types';
 import { today } from '../lib/format';
 
-const initial: AffaireInput = { nom: '', client: '', montantVenduHt: 0, tauxHoraireReference: 70, dateCreation: today(), dateCloture: null, terminee: false, commentaire: '' };
+const initial: AffaireInput = { nom: '', client: '', montantVenduHt: 0, tauxHoraireReference: 70, dateCreation: today(), dateCloture: null, dateEcheance: null, terminee: false, commentaire: '' };
 
 export function AffaireFormModal({ affaire, onClose, onSaved }: { affaire?: AffaireAvecStats; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState<AffaireInput>(initial);
@@ -12,7 +12,7 @@ export function AffaireFormModal({ affaire, onClose, onSaved }: { affaire?: Affa
   const [saving, setSaving] = useState(false);
   const afficheTauxReel = Boolean(affaire && form.terminee && affaire.heuresConsommees > 0);
   const tauxReelCalcule = calculerTauxHoraireProduction(form, affaire?.heuresConsommees ?? 0);
-  useEffect(() => { if (affaire) { const { id: _id, heuresConsommees: _h, montantConsomme: _m, creditRestantEuros: _c, creditRestantHeures: _ch, tauxHoraireReel: _t, ratioConsommation: _r, ...values } = affaire; setForm(values); } }, [affaire]);
+  useEffect(() => { if (affaire) { const { id: _id, heuresConsommees: _h, montantConsomme: _m, creditRestantEuros: _c, creditRestantHeures: _ch, tauxHoraireReel: _t, ratioConsommation: _r, prevision: _p, ...values } = affaire; setForm(values); } }, [affaire]);
 
   const set = <K extends keyof AffaireInput>(key: K, value: AffaireInput[K]) => setForm((prev) => ({ ...prev, [key]: value }));
   const submit = async (event: FormEvent) => {
@@ -34,7 +34,8 @@ export function AffaireFormModal({ affaire, onClose, onSaved }: { affaire?: Affa
         <label><span className="label">Prix vendu HT (€) *</span><input type="number" min="0" step="0.01" className="field" value={form.montantVenduHt} onChange={(e) => set('montantVenduHt', Number(e.target.value))} /></label>
         <label><span className="label">{afficheTauxReel ? 'Taux horaire réel calculé (€)' : 'Taux horaire de référence (€) *'}</span><input type="number" min="0.01" step="0.01" className={`field ${afficheTauxReel ? 'cursor-not-allowed bg-slate-100 text-slate-500' : ''}`} value={afficheTauxReel ? tauxReelCalcule.toFixed(2) : form.tauxHoraireReference} onChange={(e) => set('tauxHoraireReference', Number(e.target.value))} disabled={afficheTauxReel} />{afficheTauxReel && <span className="mt-1.5 block text-xs text-slate-500">Montant vendu ÷ {affaire!.heuresConsommees.toLocaleString('fr-FR')} heures pointées</span>}</label>
         <label><span className="label">Date de clôture</span><input type="date" className="field" value={form.dateCloture ?? ''} onChange={(e) => set('dateCloture', e.target.value || null)} /></label>
-        <label className="flex items-end pb-2"><span className="flex items-center gap-2 text-sm font-medium text-slate-700"><input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={form.terminee} onChange={(e) => set('terminee', e.target.checked)} /> Affaire terminée</span></label>
+        <label><span className="label">Échéance prévisionnelle</span><input type="date" className="field" value={form.dateEcheance ?? ''} onChange={(e) => set('dateEcheance', e.target.value || null)} /></label>
+        <label className="col-span-2 flex items-end pb-2"><span className="flex items-center gap-2 text-sm font-medium text-slate-700"><input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={form.terminee} onChange={(e) => set('terminee', e.target.checked)} /> Affaire terminée</span></label>
         <label className="col-span-2"><span className="label">Commentaire</span><textarea rows={3} className="field resize-none" value={form.commentaire} onChange={(e) => set('commentaire', e.target.value)} /></label>
       </div>
       {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}

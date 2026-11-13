@@ -2,6 +2,15 @@
 
 Application de bureau locale pour suivre les affaires, les pointages et la rentabilité.
 
+## Fonctions principales
+
+- tableau de bord, alertes de rentabilité et prévisions à l’échéance ;
+- saisie individuelle ou hebdomadaire et modification des pointages ;
+- budgets d’heures par catégorie ;
+- export et import Excel, rapports PDF par affaire ;
+- sauvegarde SQLite manuelle et sauvegarde quotidienne automatique ;
+- migrations automatiques des anciennes bases.
+
 ## Prérequis
 
 - Node.js 22 LTS

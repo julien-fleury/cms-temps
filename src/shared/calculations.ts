@@ -1,4 +1,4 @@
-import type { Affaire, AffaireAvecStats, StatistiquesAffaire } from './types.js';
+import type { Affaire, AffaireAvecStats, PrevisionAffaire, StatistiquesAffaire } from './types.js';
 
 const round = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -40,4 +40,34 @@ export function calculerHeuresRestantes(
   return round(affaires
     .filter((affaire) => !affaire.terminee)
     .reduce((total, affaire) => total + Math.max(0, affaire.creditRestantHeures), 0));
+}
+
+export function calculerPrevision(
+  affaire: Pick<Affaire, 'montantVenduHt' | 'tauxHoraireReference' | 'dateEcheance' | 'terminee'>,
+  heuresConsommees: number,
+  heuresHuitSemaines: number,
+  today = new Date(),
+): PrevisionAffaire {
+  const budgetHeures = affaire.tauxHoraireReference > 0 ? affaire.montantVenduHt / affaire.tauxHoraireReference : 0;
+  const rythmeHebdomadaire = heuresHuitSemaines / 8;
+  const restantes = budgetHeures - heuresConsommees;
+  let dateEpuisementBudget: string | null = null;
+  if (!affaire.terminee && rythmeHebdomadaire > 0 && restantes > 0) {
+    const exhaustion = new Date(today);
+    exhaustion.setDate(exhaustion.getDate() + Math.ceil((restantes / rythmeHebdomadaire) * 7));
+    dateEpuisementBudget = exhaustion.toLocaleDateString('en-CA');
+  }
+  let heuresProjetees: number | null = null;
+  if (!affaire.terminee && affaire.dateEcheance && rythmeHebdomadaire > 0) {
+    const deadline = new Date(`${affaire.dateEcheance}T12:00:00`);
+    const weeks = Math.max(0, (deadline.getTime() - today.getTime()) / 604_800_000);
+    heuresProjetees = round(heuresConsommees + weeks * rythmeHebdomadaire);
+  }
+  return {
+    budgetHeures: round(budgetHeures),
+    rythmeHebdomadaire: round(rythmeHebdomadaire),
+    heuresProjetees,
+    dateEpuisementBudget,
+    depassementPrevu: heuresProjetees !== null && heuresProjetees > budgetHeures,
+  };
 }

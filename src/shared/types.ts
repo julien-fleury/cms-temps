@@ -14,6 +14,7 @@ export interface Affaire {
   tauxHoraireReference: number;
   dateCreation: string;
   dateCloture: string | null;
+  dateEcheance: string | null;
   terminee: boolean;
   commentaire: string;
 }
@@ -40,7 +41,31 @@ export interface StatistiquesAffaire {
   ratioConsommation: number;
 }
 
-export interface AffaireAvecStats extends Affaire, StatistiquesAffaire {}
+export interface PrevisionAffaire {
+  budgetHeures: number;
+  rythmeHebdomadaire: number;
+  heuresProjetees: number | null;
+  dateEpuisementBudget: string | null;
+  depassementPrevu: boolean;
+}
+
+export interface AffaireAvecStats extends Affaire, StatistiquesAffaire {
+  prevision: PrevisionAffaire;
+}
+
+export interface BudgetCategorie {
+  categorie: Categorie;
+  heuresPrevues: number;
+  heuresConsommees: number;
+  heuresRestantes: number;
+}
+
+export interface AlerteAffaire {
+  affaireId: number;
+  nom: string;
+  niveau: 'attention' | 'depassement';
+  message: string;
+}
 
 export interface DashboardData {
   affairesActives: number;
@@ -52,7 +77,10 @@ export interface DashboardData {
   heuresParMois: Array<{ mois: string; heures: number }>;
   caProduitParMois: Array<{ mois: string; heures: number; ca: number; caParHeure: number }>;
   rentabiliteParAffaire: Array<{ nom: string; credit: number; consommation: number }>;
+  alertes: AlerteAffaire[];
 }
+
+export interface ImportResult { affaires: number; pointages: number; }
 
 export interface CmsApi {
   affaires: {
@@ -67,9 +95,16 @@ export interface CmsApi {
     create: (input: PointageInput) => Promise<number>;
     update: (id: number, input: PointageInput) => Promise<void>;
     remove: (id: number) => Promise<void>;
+    createMany: (inputs: PointageInput[]) => Promise<number>;
+  };
+  budgets: {
+    get: (affaireId: number) => Promise<BudgetCategorie[]>;
+    save: (affaireId: number, budgets: Array<{ categorie: Categorie; heuresPrevues: number }>) => Promise<void>;
   };
   dashboard: () => Promise<DashboardData>;
   exportExcel: () => Promise<string | null>;
+  importExcel: () => Promise<ImportResult | null>;
+  reportPdf: (affaireId: number) => Promise<string | null>;
   backup: () => Promise<string | null>;
   restore: () => Promise<boolean>;
 }

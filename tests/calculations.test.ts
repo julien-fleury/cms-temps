@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculerHeuresRestantes, calculerStatistiques, calculerTauxHoraireProduction, niveauRentabilite } from '../src/shared/calculations';
+import { calculerHeuresRestantes, calculerPrevision, calculerStatistiques, calculerTauxHoraireProduction, niveauRentabilite } from '../src/shared/calculations';
 
 describe('calculerStatistiques', () => {
   it('calcule les crédits et le taux réel', () => {
@@ -26,5 +26,15 @@ describe('règles de clôture et de charge restante', () => {
       { terminee: false, creditRestantHeures: -3 },
       { terminee: true, creditRestantHeures: 8 },
     ])).toBe(12.5);
+  });
+
+  it('détecte un dépassement prévisionnel à l’échéance', () => {
+    const result = calculerPrevision(
+      { montantVenduHt: 5000, tauxHoraireReference: 100, dateEcheance: '2026-02-26', terminee: false },
+      30, 80, new Date('2026-01-01T12:00:00'),
+    );
+    expect(result.rythmeHebdomadaire).toBe(10);
+    expect(result.heuresProjetees).toBe(110);
+    expect(result.depassementPrevu).toBe(true);
   });
 });

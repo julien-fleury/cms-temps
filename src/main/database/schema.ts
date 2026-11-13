@@ -9,6 +9,7 @@ export const schema = `
     taux_horaire_reference REAL NOT NULL CHECK (taux_horaire_reference > 0),
     date_creation TEXT NOT NULL,
     date_cloture TEXT,
+    date_echeance TEXT,
     terminee INTEGER NOT NULL DEFAULT 0 CHECK (terminee IN (0, 1)),
     commentaire TEXT NOT NULL DEFAULT ''
   );
@@ -25,6 +26,15 @@ export const schema = `
 
   CREATE INDEX IF NOT EXISTS idx_pointages_affaire ON pointages(affaire_id);
   CREATE INDEX IF NOT EXISTS idx_pointages_date ON pointages(date);
+
+  CREATE TABLE IF NOT EXISTS budgets_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    affaire_id INTEGER NOT NULL,
+    categorie TEXT NOT NULL,
+    heures_prevues REAL NOT NULL DEFAULT 0 CHECK (heures_prevues >= 0),
+    UNIQUE (affaire_id, categorie),
+    FOREIGN KEY (affaire_id) REFERENCES affaires(id) ON DELETE CASCADE
+  );
 `;
 
 export const seed = `

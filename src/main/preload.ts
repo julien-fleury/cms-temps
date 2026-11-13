@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AffaireInput, CmsApi, PointageInput } from '../shared/types.js';
+import type { AffaireInput, Categorie, CmsApi, PointageInput } from '../shared/types.js';
 
 const api: CmsApi = {
   affaires: {
@@ -14,9 +14,16 @@ const api: CmsApi = {
     create: (input: PointageInput) => ipcRenderer.invoke('pointages:create', input),
     update: (id, input: PointageInput) => ipcRenderer.invoke('pointages:update', id, input),
     remove: (id) => ipcRenderer.invoke('pointages:remove', id),
+    createMany: (inputs) => ipcRenderer.invoke('pointages:create-many', inputs),
+  },
+  budgets: {
+    get: (affaireId) => ipcRenderer.invoke('budgets:get', affaireId),
+    save: (affaireId, budgets: Array<{ categorie: Categorie; heuresPrevues: number }>) => ipcRenderer.invoke('budgets:save', affaireId, budgets),
   },
   dashboard: () => ipcRenderer.invoke('dashboard'),
   exportExcel: () => ipcRenderer.invoke('export:excel'),
+  importExcel: () => ipcRenderer.invoke('import:excel'),
+  reportPdf: (affaireId) => ipcRenderer.invoke('report:pdf', affaireId),
   backup: () => ipcRenderer.invoke('database:backup'),
   restore: () => ipcRenderer.invoke('database:restore'),
 };
