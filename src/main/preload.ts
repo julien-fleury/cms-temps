@@ -20,6 +20,12 @@ const api: CmsApi = {
     get: (affaireId) => ipcRenderer.invoke('budgets:get', affaireId),
     save: (affaireId, budgets: Array<{ categorie: Categorie; heuresPrevues: number }>) => ipcRenderer.invoke('budgets:save', affaireId, budgets),
   },
+  categories: {
+    list: () => ipcRenderer.invoke('categories:list'),
+    create: (nom) => ipcRenderer.invoke('categories:create', nom),
+    rename: (id, nom) => ipcRenderer.invoke('categories:rename', id, nom),
+    remove: (id, remplacementId) => ipcRenderer.invoke('categories:remove', id, remplacementId),
+  },
   dashboard: () => ipcRenderer.invoke('dashboard'),
   exportExcel: () => ipcRenderer.invoke('export:excel'),
   importExcel: () => ipcRenderer.invoke('import:excel'),

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { calculerHeuresRestantes, calculerPrevision } from '../../shared/calculations.js';
-import { CATEGORIES, type AffaireAvecStats, type AffaireInput, type AlerteAffaire, type BudgetCategorie, type Categorie, type DashboardData, type Pointage, type PointageInput } from '../../shared/types.js';
+import type { AffaireAvecStats, AffaireInput, AlerteAffaire, BudgetCategorie, Categorie, CategorieTravail, DashboardData, Pointage, PointageInput } from '../../shared/types.js';
 
 type AffaireRow = {
   id: number; nom: string; client: string; montantVenduHt: number; tauxHoraireReference: number;
@@ -34,6 +34,93 @@ const mapAffaire = (row: AffaireRow): AffaireAvecStats => {
 
 export class DataService {
   constructor(private readonly getDb: () => DatabaseSync) {}
+
+  private categorieName(id: number): string | null {
+    const row = this.getDb().prepare('SELECT nom FROM categories WHERE id = ?').get(id) as { nom: string } | undefined;
+    return row?.nom ?? null;
+  }
+
+  private requireCategorie(nom: string): string {
+    const value = nom.trim();
+    const row = this.getDb().prepare('SELECT nom FROM categories WHERE nom = ? COLLATE NOCASE').get(value) as { nom: string } | undefined;
+    if (!row) throw new Error(`Catégorie inconnue : ${value}`);
+    return row.nom;
+  }
+
+  listCategories(): CategorieTravail[] {
+    return this.getDb().prepare(`SELECT c.id, c.nom, c.ordre,
+      (SELECT COUNT(*) FROM pointages p WHERE p.categorie = c.nom COLLATE NOCASE) AS usagePointages,
+      (SELECT COUNT(*) FROM budgets_categories b WHERE b.categorie = c.nom COLLATE NOCASE AND b.heures_prevues > 0) AS usageBudgets
+      FROM categories c ORDER BY c.ordre, c.nom COLLATE NOCASE`).all() as unknown as CategorieTravail[];
+  }
+
+  createCategorie(nom: string): number {
+    const value = nom.trim();
+    if (!value || value.length > 80) throw new Error('Le nom doit contenir entre 1 et 80 caractères.');
+    const duplicate = this.getDb().prepare('SELECT id FROM categories WHERE nom = ? COLLATE NOCASE').get(value);
+    if (duplicate) throw new Error('Cette catégorie existe déjà.');
+    const ordre = (this.getDb().prepare('SELECT COALESCE(MAX(ordre), -1) + 1 AS ordre FROM categories').get() as { ordre: number }).ordre;
+    return Number(this.getDb().prepare('INSERT INTO categories (nom, ordre) VALUES (?, ?)').run(value, ordre).lastInsertRowid);
+  }
+
+  ensureCategorie(nom: string): string {
+    const value = nom.trim() || 'Autre';
+    const existing = this.getDb().prepare('SELECT nom FROM categories WHERE nom = ? COLLATE NOCASE').get(value) as { nom: string } | undefined;
+    if (existing) return existing.nom;
+    this.createCategorie(value);
+    return value;
+  }
+
+  renameCategorie(id: number, nom: string): void {
+    const current = this.categorieName(id);
+    if (!current) throw new Error('Catégorie introuvable.');
+    const value = nom.trim();
+    if (!value || value.length > 80) throw new Error('Le nom doit contenir entre 1 et 80 caractères.');
+    const duplicate = this.getDb().prepare('SELECT id FROM categories WHERE nom = ? COLLATE NOCASE AND id <> ?').get(value, id);
+    if (duplicate) throw new Error('Cette catégorie existe déjà.');
+    const db = this.getDb();
+    db.exec('BEGIN');
+    try {
+      db.prepare('UPDATE categories SET nom = ? WHERE id = ?').run(value, id);
+      db.prepare('UPDATE pointages SET categorie = ? WHERE categorie = ? COLLATE NOCASE').run(value, current);
+      db.prepare('UPDATE budgets_categories SET categorie = ? WHERE categorie = ? COLLATE NOCASE').run(value, current);
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  removeCategorie(id: number, remplacementId?: number): void {
+    const db = this.getDb();
+    const current = this.categorieName(id);
+    if (!current) throw new Error('Catégorie introuvable.');
+    const total = (db.prepare('SELECT COUNT(*) AS count FROM categories').get() as { count: number }).count;
+    if (total <= 1) throw new Error('Au moins une catégorie doit être conservée.');
+    const replacement = remplacementId === undefined ? null : this.categorieName(remplacementId);
+    if (remplacementId !== undefined && (!replacement || remplacementId === id)) throw new Error('Catégorie de remplacement invalide.');
+    const usagePointages = (db.prepare('SELECT COUNT(*) AS count FROM pointages WHERE categorie = ? COLLATE NOCASE').get(current) as { count: number }).count;
+    const usageBudgets = (db.prepare('SELECT COUNT(*) AS count FROM budgets_categories WHERE categorie = ? COLLATE NOCASE AND heures_prevues > 0').get(current) as { count: number }).count;
+    if ((usagePointages > 0 || usageBudgets > 0) && !replacement) throw new Error('Cette catégorie est utilisée. Choisissez une catégorie de remplacement.');
+
+    db.exec('BEGIN');
+    try {
+      if (replacement) {
+        db.prepare('UPDATE pointages SET categorie = ? WHERE categorie = ? COLLATE NOCASE').run(replacement, current);
+        const budgets = db.prepare('SELECT affaire_id AS affaireId, heures_prevues AS heuresPrevues FROM budgets_categories WHERE categorie = ? COLLATE NOCASE AND heures_prevues > 0')
+          .all(current) as unknown as Array<{ affaireId: number; heuresPrevues: number }>;
+        const merge = db.prepare(`INSERT INTO budgets_categories (affaire_id, categorie, heures_prevues) VALUES (?, ?, ?)
+          ON CONFLICT(affaire_id, categorie) DO UPDATE SET heures_prevues = heures_prevues + excluded.heures_prevues`);
+        for (const budget of budgets) merge.run(budget.affaireId, replacement, budget.heuresPrevues);
+      }
+      db.prepare('DELETE FROM budgets_categories WHERE categorie = ? COLLATE NOCASE').run(current);
+      db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  }
 
   listAffaires(): AffaireAvecStats[] {
     const rows = this.getDb().prepare(`${affaireSelect} GROUP BY a.id ORDER BY a.terminee, a.date_creation DESC`).all() as AffaireRow[];
@@ -70,26 +157,33 @@ export class DataService {
   }
 
   createPointage(input: PointageInput): number {
+    const categorie = this.requireCategorie(input.categorie);
     const result = this.getDb().prepare(`INSERT INTO pointages (affaire_id, date, heures, categorie, commentaire)
       VALUES (?, ?, ?, ?, ?)`)
-      .run(input.affaireId, input.date, input.heures, input.categorie, input.commentaire.trim());
+      .run(input.affaireId, input.date, input.heures, categorie, input.commentaire.trim());
     return Number(result.lastInsertRowid);
   }
 
   updatePointage(id: number, input: PointageInput): void {
+    const categorie = this.requireCategorie(input.categorie);
     this.getDb().prepare('UPDATE pointages SET affaire_id=?, date=?, heures=?, categorie=?, commentaire=? WHERE id=?')
-      .run(input.affaireId, input.date, input.heures, input.categorie, input.commentaire.trim(), id);
+      .run(input.affaireId, input.date, input.heures, categorie, input.commentaire.trim(), id);
   }
 
   removePointage(id: number): void { this.getDb().prepare('DELETE FROM pointages WHERE id = ?').run(id); }
 
   createPointages(inputs: PointageInput[]): number {
     const db = this.getDb();
+    const categories = new Map(this.listCategories().map((item) => [item.nom.toLocaleLowerCase('fr'), item.nom]));
     const statement = db.prepare(`INSERT INTO pointages (affaire_id, date, heures, categorie, commentaire)
       VALUES (?, ?, ?, ?, ?)`);
     db.exec('BEGIN');
     try {
-      for (const input of inputs) statement.run(input.affaireId, input.date, input.heures, input.categorie, input.commentaire.trim());
+      for (const input of inputs) {
+        const categorie = categories.get(input.categorie.trim().toLocaleLowerCase('fr'));
+        if (!categorie) throw new Error(`Catégorie inconnue : ${input.categorie}`);
+        statement.run(input.affaireId, input.date, input.heures, categorie, input.commentaire.trim());
+      }
       db.exec('COMMIT');
       return inputs.length;
     } catch (error) {
@@ -107,7 +201,8 @@ export class DataService {
     const consumed = this.getDb().prepare(`SELECT categorie, SUM(heures) AS heuresConsommees FROM pointages
       WHERE affaire_id = ? GROUP BY categorie`).all(affaireId) as unknown as Array<{ categorie: Categorie; heuresConsommees: number }>;
     const consumedMap = new Map(consumed.map((row) => [row.categorie, row.heuresConsommees]));
-    return CATEGORIES.map((categorie) => {
+    const categories = this.getDb().prepare('SELECT nom FROM categories ORDER BY ordre, nom COLLATE NOCASE').all() as unknown as Array<{ nom: string }>;
+    return categories.map(({ nom: categorie }) => {
       const heuresPrevues = byCategory.get(categorie)?.heuresPrevues ?? 0;
       const heuresConsommees = consumedMap.get(categorie) ?? 0;
       return { categorie, heuresPrevues, heuresConsommees, heuresRestantes: Math.round((heuresPrevues - heuresConsommees) * 100) / 100 };
@@ -120,7 +215,7 @@ export class DataService {
       VALUES (?, ?, ?) ON CONFLICT(affaire_id, categorie) DO UPDATE SET heures_prevues=excluded.heures_prevues`);
     db.exec('BEGIN');
     try {
-      for (const budget of budgets) statement.run(affaireId, budget.categorie, Math.max(0, budget.heuresPrevues));
+      for (const budget of budgets) statement.run(affaireId, this.requireCategorie(budget.categorie), Math.max(0, budget.heuresPrevues));
       db.exec('COMMIT');
     } catch (error) {
       db.exec('ROLLBACK');

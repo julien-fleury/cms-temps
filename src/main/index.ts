@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import * as XLSX from 'xlsx';
 import { DatabaseManager } from './database/index.js';
 import { DataService } from './services/data-service.js';
-import { CATEGORIES, type AffaireInput, type Categorie, type PointageInput } from '../shared/types.js';
+import type { AffaireInput, Categorie, PointageInput } from '../shared/types.js';
 
 let mainWindow: BrowserWindow | null = null;
 let manager: DatabaseManager;
@@ -60,6 +60,10 @@ function registerHandlers(service: DataService): void {
   ipcMain.handle('pointages:create-many', (_e, inputs: PointageInput[]) => service.createPointages(inputs));
   ipcMain.handle('budgets:get', (_e, affaireId: number) => service.getBudgets(affaireId));
   ipcMain.handle('budgets:save', (_e, affaireId: number, budgets: Array<{ categorie: Categorie; heuresPrevues: number }>) => service.saveBudgets(affaireId, budgets));
+  ipcMain.handle('categories:list', () => service.listCategories());
+  ipcMain.handle('categories:create', (_e, nom: string) => service.createCategorie(nom));
+  ipcMain.handle('categories:rename', (_e, id: number, nom: string) => service.renameCategorie(id, nom));
+  ipcMain.handle('categories:remove', (_e, id: number, remplacementId?: number) => service.removeCategorie(id, remplacementId));
   ipcMain.handle('dashboard', () => service.dashboard());
   ipcMain.handle('export:excel', async () => {
     const result = await dialog.showSaveDialog(mainWindow!, { title: 'Exporter les données', defaultPath: 'CMS-Temps-export.xlsx', filters: [{ name: 'Classeur Excel', extensions: ['xlsx'] }] });
@@ -67,10 +71,12 @@ function registerHandlers(service: DataService): void {
     const affaires = service.listAffaires().map(({ prevision, ...affaire }) => ({ ...affaire, ...prevision }));
     const pointages = service.listPointages();
     const budgets = service.listAffaires().flatMap((affaire) => service.getBudgets(affaire.id).filter((budget) => budget.heuresPrevues > 0).map((budget) => ({ affaireId: affaire.id, affaire: affaire.nom, ...budget })));
+    const categories = service.listCategories().map(({ id, nom, ordre }) => ({ id, nom, ordre }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(affaires), 'Affaires');
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(pointages), 'Pointages');
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(budgets), 'Budgets');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(categories), 'Categories');
     XLSX.writeFile(workbook, result.filePath);
     return result.filePath;
   });
@@ -81,6 +87,8 @@ function registerHandlers(service: DataService): void {
     const affaireRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.Affaires ?? workbook.Sheets[workbook.SheetNames[0]]);
     const pointageRows = workbook.Sheets.Pointages ? XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.Pointages) : [];
     const budgetRows = workbook.Sheets.Budgets ? XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.Budgets) : [];
+    const categorieRows = workbook.Sheets.Categories ? XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.Categories) : [];
+    for (const row of categorieRows) service.ensureCategorie(String(row.nom ?? row.Nom ?? ''));
     const idMap = new Map<number, number>();
     for (const row of affaireRows) {
       const oldId = Number(row.id ?? 0);
@@ -95,16 +103,16 @@ function registerHandlers(service: DataService): void {
     }
     const inputs = pointageRows.flatMap((row): PointageInput[] => {
       const affaireId = idMap.get(Number(row.affaireId ?? row.affaire_id)) ?? Number(row.affaireId ?? row.affaire_id ?? 0);
-      const categorie = String(row.categorie ?? 'Autre') as Categorie;
-      if (!affaireId || !CATEGORIES.includes(categorie)) return [];
+      const categorie = service.ensureCategorie(String(row.categorie ?? 'Autre'));
+      if (!affaireId) return [];
       return [{ affaireId, date: normalizeDate(row.date), heures: Number(row.heures ?? 0), categorie, commentaire: String(row.commentaire ?? '') }];
     }).filter((input) => input.heures > 0);
     service.createPointages(inputs);
     const budgetsByAffaire = new Map<number, Array<{ categorie: Categorie; heuresPrevues: number }>>();
     for (const row of budgetRows) {
       const affaireId = idMap.get(Number(row.affaireId ?? row.affaire_id)) ?? Number(row.affaireId ?? row.affaire_id ?? 0);
-      const categorie = String(row.categorie ?? '') as Categorie;
-      if (!affaireId || !CATEGORIES.includes(categorie)) continue;
+      const categorie = service.ensureCategorie(String(row.categorie ?? 'Autre'));
+      if (!affaireId) continue;
       const list = budgetsByAffaire.get(affaireId) ?? [];
       list.push({ categorie, heuresPrevues: Number(row.heuresPrevues ?? row.heures_prevues ?? 0) });
       budgetsByAffaire.set(affaireId, list);

@@ -14,7 +14,8 @@ describe('migrations SQLite', () => {
     const legacy = new DatabaseSync(file);
     legacy.exec(`CREATE TABLE affaires (id INTEGER PRIMARY KEY, nom TEXT, client TEXT, montant_vendu_ht REAL, taux_horaire_reference REAL, date_creation TEXT, date_cloture TEXT, terminee INTEGER, commentaire TEXT);
       CREATE TABLE pointages (id INTEGER PRIMARY KEY, affaire_id INTEGER, date TEXT, heures REAL, categorie TEXT, commentaire TEXT);
-      INSERT INTO affaires VALUES (1, 'Test migration', 'Client', 1000, 100, '2026-01-01', NULL, 0, 'Conservé');`);
+      INSERT INTO affaires VALUES (1, 'Test migration', 'Client', 1000, 100, '2026-01-01', NULL, 0, 'Conservé');
+      INSERT INTO pointages VALUES (1, 1, '2026-01-02', 2, 'Catégorie historique', 'Conservé');`);
     legacy.close();
 
     const manager = new DatabaseManager(file);
@@ -23,8 +24,12 @@ describe('migrations SQLite', () => {
     const budgets = manager.db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE name='budgets_categories'").get() as { count: number };
     expect(affaire.nom).toBe('Test migration');
     expect(affaire.date_echeance).toBeNull();
-    expect(version.user_version).toBe(2);
+    expect(version.user_version).toBe(3);
     expect(budgets.count).toBe(1);
+    const categories = manager.db.prepare('SELECT COUNT(*) AS count FROM categories').get() as { count: number };
+    expect(categories.count).toBe(10);
+    const historical = manager.db.prepare("SELECT COUNT(*) AS count FROM categories WHERE nom='Catégorie historique'").get() as { count: number };
+    expect(historical.count).toBe(1);
     manager.close();
   });
 });

@@ -27,6 +27,12 @@ export const schema = `
   CREATE INDEX IF NOT EXISTS idx_pointages_affaire ON pointages(affaire_id);
   CREATE INDEX IF NOT EXISTS idx_pointages_date ON pointages(date);
 
+  CREATE TABLE IF NOT EXISTS categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    ordre INTEGER NOT NULL DEFAULT 0
+  );
+
   CREATE TABLE IF NOT EXISTS budgets_categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     affaire_id INTEGER NOT NULL,

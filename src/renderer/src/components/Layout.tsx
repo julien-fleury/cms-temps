@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BarChart3, BriefcaseBusiness, CalendarDays, Clock3, Database, Plus } from 'lucide-react';
+import { BarChart3, BriefcaseBusiness, CalendarDays, Clock3, Database, Plus, Tags } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const links = [
@@ -7,6 +7,7 @@ const links = [
   { to: '/affaires', label: 'Affaires', icon: BriefcaseBusiness },
   { to: '/pointages/nouveau', label: 'Saisir du temps', icon: Clock3 },
   { to: '/semaine', label: 'Saisie hebdomadaire', icon: CalendarDays },
+  { to: '/categories', label: 'Types de tâche', icon: Tags },
   { to: '/donnees', label: 'Données', icon: Database },
 ];
 

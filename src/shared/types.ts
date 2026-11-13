@@ -1,10 +1,18 @@
-export const CATEGORIES = [
+export const DEFAULT_CATEGORIES = [
   'Réunion', 'Modélisation existant', 'Modélisation ensemble',
   "Plans d'implantation", "Plans d'ensemble", 'Plans de détail',
   'Dossier fabrication', 'Mise à jour', 'Autre',
 ] as const;
 
-export type Categorie = (typeof CATEGORIES)[number];
+export type Categorie = string;
+
+export interface CategorieTravail {
+  id: number;
+  nom: string;
+  ordre: number;
+  usagePointages: number;
+  usageBudgets: number;
+}
 
 export interface Affaire {
   id: number;
@@ -100,6 +108,12 @@ export interface CmsApi {
   budgets: {
     get: (affaireId: number) => Promise<BudgetCategorie[]>;
     save: (affaireId: number, budgets: Array<{ categorie: Categorie; heuresPrevues: number }>) => Promise<void>;
+  };
+  categories: {
+    list: () => Promise<CategorieTravail[]>;
+    create: (nom: string) => Promise<number>;
+    rename: (id: number, nom: string) => Promise<void>;
+    remove: (id: number, remplacementId?: number) => Promise<void>;
   };
   dashboard: () => Promise<DashboardData>;
   exportExcel: () => Promise<string | null>;
