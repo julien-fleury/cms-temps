@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { calculerHeuresRestantes } from '../../shared/calculations.js';
 import type { AffaireAvecStats, AffaireInput, DashboardData, Pointage, PointageInput } from '../../shared/types.js';
 
 type AffaireRow = {
@@ -81,19 +82,28 @@ export class DataService {
     const summary = db.prepare(`SELECT
       SUM(CASE WHEN terminee = 0 THEN 1 ELSE 0 END) AS affairesActives,
       SUM(CASE WHEN terminee = 1 THEN 1 ELSE 0 END) AS affairesTerminees,
-      COALESCE(SUM(montant_vendu_ht), 0) AS chiffreAffairesTotal FROM affaires`).get() as Omit<DashboardData, 'heuresMois' | 'heuresTotales' | 'heuresParMois' | 'caProduitParMois' | 'rentabiliteParAffaire'>;
+      COALESCE(SUM(montant_vendu_ht), 0) AS chiffreAffairesTotal FROM affaires`).get() as Omit<DashboardData, 'heuresMois' | 'heuresTotales' | 'heuresRestantes' | 'heuresParMois' | 'caProduitParMois' | 'rentabiliteParAffaire'>;
     const hours = db.prepare(`SELECT COALESCE(SUM(heures), 0) AS heuresTotales,
       COALESCE(SUM(CASE WHEN strftime('%Y-%m', date) = strftime('%Y-%m', 'now', 'localtime') THEN heures ELSE 0 END), 0) AS heuresMois
       FROM pointages`).get() as Pick<DashboardData, 'heuresMois' | 'heuresTotales'>;
     const heuresParMois = db.prepare(`SELECT substr(date, 1, 7) AS mois, ROUND(SUM(heures), 2) AS heures
       FROM pointages GROUP BY substr(date, 1, 7) ORDER BY mois`).all() as DashboardData['heuresParMois'];
-    const caProduitParMois = db.prepare(`SELECT substr(p.date, 1, 7) AS mois,
+    const caProduitParMois = db.prepare(`WITH heures_affaire AS (
+      SELECT affaire_id, SUM(heures) AS total_heures FROM pointages GROUP BY affaire_id
+    ) SELECT substr(p.date, 1, 7) AS mois,
       ROUND(SUM(p.heures), 2) AS heures,
-      ROUND(SUM(p.heures * a.taux_horaire_reference), 2) AS ca,
-      ROUND(SUM(p.heures * a.taux_horaire_reference) / SUM(p.heures), 2) AS caParHeure
+      ROUND(SUM(p.heures * CASE
+        WHEN a.terminee = 1 AND ha.total_heures > 0 THEN a.montant_vendu_ht / ha.total_heures
+        ELSE a.taux_horaire_reference END), 2) AS ca,
+      ROUND(SUM(p.heures * CASE
+        WHEN a.terminee = 1 AND ha.total_heures > 0 THEN a.montant_vendu_ht / ha.total_heures
+        ELSE a.taux_horaire_reference END) / SUM(p.heures), 2) AS caParHeure
       FROM pointages p INNER JOIN affaires a ON a.id = p.affaire_id
+      INNER JOIN heures_affaire ha ON ha.affaire_id = a.id
       GROUP BY substr(p.date, 1, 7) ORDER BY mois`).all() as DashboardData['caProduitParMois'];
-    const rentabiliteParAffaire = this.listAffaires().map((a) => ({ nom: a.nom, credit: a.creditRestantEuros, consommation: a.ratioConsommation }));
-    return { ...summary, ...hours, heuresParMois, caProduitParMois, rentabiliteParAffaire };
+    const affaires = this.listAffaires();
+    const heuresRestantes = calculerHeuresRestantes(affaires);
+    const rentabiliteParAffaire = affaires.map((a) => ({ nom: a.nom, credit: a.creditRestantEuros, consommation: a.ratioConsommation }));
+    return { ...summary, ...hours, heuresRestantes, heuresParMois, caProduitParMois, rentabiliteParAffaire };
   }
 }

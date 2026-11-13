@@ -1,4 +1,4 @@
-import type { Affaire, StatistiquesAffaire } from './types.js';
+import type { Affaire, AffaireAvecStats, StatistiquesAffaire } from './types.js';
 
 const round = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -24,4 +24,20 @@ export function niveauRentabilite(ratio: number): 'rentable' | 'attention' | 'de
   if (ratio > 100) return 'depassement';
   if (ratio >= 80) return 'attention';
   return 'rentable';
+}
+
+export function calculerTauxHoraireProduction(
+  affaire: Pick<Affaire, 'montantVenduHt' | 'tauxHoraireReference' | 'terminee'>,
+  heuresConsommees: number,
+): number {
+  if (affaire.terminee && heuresConsommees > 0) return round(affaire.montantVenduHt / heuresConsommees);
+  return affaire.tauxHoraireReference;
+}
+
+export function calculerHeuresRestantes(
+  affaires: Array<Pick<AffaireAvecStats, 'terminee' | 'creditRestantHeures'>>,
+): number {
+  return round(affaires
+    .filter((affaire) => !affaire.terminee)
+    .reduce((total, affaire) => total + Math.max(0, affaire.creditRestantHeures), 0));
 }

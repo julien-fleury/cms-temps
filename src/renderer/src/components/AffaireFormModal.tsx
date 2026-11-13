@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
+import { calculerTauxHoraireProduction } from '../../../shared/calculations';
 import type { AffaireAvecStats, AffaireInput } from '../../../shared/types';
 import { today } from '../lib/format';
 
@@ -9,6 +10,8 @@ export function AffaireFormModal({ affaire, onClose, onSaved }: { affaire?: Affa
   const [form, setForm] = useState<AffaireInput>(initial);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const afficheTauxReel = Boolean(affaire && form.terminee && affaire.heuresConsommees > 0);
+  const tauxReelCalcule = calculerTauxHoraireProduction(form, affaire?.heuresConsommees ?? 0);
   useEffect(() => { if (affaire) { const { id: _id, heuresConsommees: _h, montantConsomme: _m, creditRestantEuros: _c, creditRestantHeures: _ch, tauxHoraireReel: _t, ratioConsommation: _r, ...values } = affaire; setForm(values); } }, [affaire]);
 
   const set = <K extends keyof AffaireInput>(key: K, value: AffaireInput[K]) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -29,7 +32,7 @@ export function AffaireFormModal({ affaire, onClose, onSaved }: { affaire?: Affa
         <label><span className="label">Client *</span><input className="field" value={form.client} onChange={(e) => set('client', e.target.value)} /></label>
         <label><span className="label">Date de création *</span><input type="date" className="field" value={form.dateCreation} onChange={(e) => set('dateCreation', e.target.value)} /></label>
         <label><span className="label">Prix vendu HT (€) *</span><input type="number" min="0" step="0.01" className="field" value={form.montantVenduHt} onChange={(e) => set('montantVenduHt', Number(e.target.value))} /></label>
-        <label><span className="label">Taux horaire de référence (€) *</span><input type="number" min="0.01" step="0.01" className="field" value={form.tauxHoraireReference} onChange={(e) => set('tauxHoraireReference', Number(e.target.value))} /></label>
+        <label><span className="label">{afficheTauxReel ? 'Taux horaire réel calculé (€)' : 'Taux horaire de référence (€) *'}</span><input type="number" min="0.01" step="0.01" className={`field ${afficheTauxReel ? 'cursor-not-allowed bg-slate-100 text-slate-500' : ''}`} value={afficheTauxReel ? tauxReelCalcule.toFixed(2) : form.tauxHoraireReference} onChange={(e) => set('tauxHoraireReference', Number(e.target.value))} disabled={afficheTauxReel} />{afficheTauxReel && <span className="mt-1.5 block text-xs text-slate-500">Montant vendu ÷ {affaire!.heuresConsommees.toLocaleString('fr-FR')} heures pointées</span>}</label>
         <label><span className="label">Date de clôture</span><input type="date" className="field" value={form.dateCloture ?? ''} onChange={(e) => set('dateCloture', e.target.value || null)} /></label>
         <label className="flex items-end pb-2"><span className="flex items-center gap-2 text-sm font-medium text-slate-700"><input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={form.terminee} onChange={(e) => set('terminee', e.target.checked)} /> Affaire terminée</span></label>
         <label className="col-span-2"><span className="label">Commentaire</span><textarea rows={3} className="field resize-none" value={form.commentaire} onChange={(e) => set('commentaire', e.target.value)} /></label>
